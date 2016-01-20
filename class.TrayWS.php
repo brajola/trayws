@@ -52,11 +52,6 @@ class TrayWS {
 			$this->StoreID	= $StoreID;
 			$this->UserName	= $UserName;
 			$this->Password	= $Password;
-			$this->SOAP		= new SoapClient($this->WSURL);
-			
-			if(!$this->SOAP){
-				throw new Exception("[CLASS INSTANCE ERROR]");
-			}
 		} catch (Exception $e) {
 			return $e->getMessage();
 		}
@@ -69,14 +64,22 @@ class TrayWS {
 	private final function __doRequest($SOAP_Method, $SOAP_Data)
 	{
 		try{
+			$config = array(
+				'trace'			=> 0,
+				'exceptions'	=> true,
+				'cache_wsdl'	=> WSDL_CACHE_NONE
+			);
+			
+			$this->SOAP = new SoapClient($this->WSURL, $config);
+			
+			if(!$this->SOAP){
+				throw new Exception("[CLASS INSTANCE ERROR]");
+			}
+			
 			$result = $this->SOAP->__soapCall($SOAP_Method, $SOAP_Data);
 		
 			if(is_soap_fault($result)){
 				throw new Exception("{$result->faultcode}:{$result->faultstring}");
-			}
-			
-			if($result['status'] !== 'ok'){
-				throw new Exception("[SOAP ERROR]");
 			}
 			
 			return $result;
@@ -145,8 +148,71 @@ class TrayWS {
 		return $this->__doRequest("fWSImportaPedidos", array(
 			'pid_loja'		=> $this->StoreID,
 			'plogin'		=> $this->UserName,
-			'psenha'		=> $this->Password
+			'psenha'		=> $this->Password,
+			'status_atual'	=> ''
 		));
+	}
+	
+	/**
+	 * Retorna os dados do cliente por Id
+	 * @author Fábio Rodriguez <brajola@gmail.com>
+	 */
+	public final function getClienteId($clienteID)
+	{
+		return $this->__doRequest("fWSImportaClientePorId", array(
+			'pid_loja'		=> $this->StoreID,
+			'plogin'		=> $this->UserName,
+			'psenha'		=> $this->Password,
+			'id_cliente'	=> $clienteID
+		));
+	}
+	
+	/**
+	 * Retorna todos os itens de um pedido
+	 * @author Fábio Rodriguez <brajola@gmail.com>
+	 */
+	public final function getItensPedido($pedidoID)
+	{
+		return $this->__doRequest("fWSImportaItensPedidoPorId", array(
+			'pid_loja'		=> $this->StoreID,
+			'plogin'		=> $this->UserName,
+			'psenha'		=> $this->Password,
+			'id_pedido'		=> $pedidoID
+		));
+	}
+	
+	/**
+	 * Retorna todas as parcelas de um pedido
+	 * @author Fábio Rodriguez <brajola@gmail.com>
+	 */
+	public final function getParcelasPedido($pedidoID)
+	{
+		return $this->__doRequest("fWSImportaParcelasPedidoPorId", array(
+			'pid_loja'		=> $this->StoreID,
+			'plogin'		=> $this->UserName,
+			'psenha'		=> $this->Password,
+			'id_pedido'		=> $pedidoID
+		));
+	}
+	
+	/**
+	 * Retorna todos os pedidos completos
+	 * @author Fábio Rodriguez <brajola@gmail.com>
+	 */
+	public final function getPedidosCompletos()
+	{
+		$pedidos = $this->getPedidos();
+
+		foreach($pedidos as $p){
+			$return[] = array(
+				'pedido'	=> $p,
+				'cliente'	=> $this->getClienteId($p->id_cliente),
+				'itens'		=> $this->getItensPedido($p->id_pedido),
+				'parcelas'	=> $this->getParcelasPedido($p->id_pedido)
+			);
+		}
+		
+		return $return;
 	}
 }
 ?>
